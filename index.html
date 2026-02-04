@@ -23,10 +23,12 @@
     <a class="nav__brand" href="#top">💗</a>
     <div class="nav__links">
       <a href="#valentine">Valentine</a>
+      <a href="#arcade">Arcade</a>
       <a href="#loveMeter">Love Meter</a>
       <a href="#reasons">Reasons</a>
       <a href="#quiz">Quiz</a>
       <a href="#bouquet">Bouquet</a>
+      <a href="#scrapbook">Scrapbook</a>
     </div>
     <button class="btn btn-small" id="letterBtn" type="button">Love Letter</button>
   </nav>
@@ -38,8 +40,19 @@
     </div>
   </header>
 
-  <main class="container" id="top">
-    <section class="card glass reveal" id="valentine">
+  <aside class="mascot glass" id="mascot" aria-label="Mascot">
+    <div class="mascot__face" aria-hidden="true">🐾</div>
+    <div class="mascot__bubble" role="status" aria-live="polite">
+      <div class="mascot__name">Tom-ish Cupid</div>
+      <div class="mascot__text" id="mascotText">Tap Games to play. I’m cheering for you 💗</div>
+    </div>
+    <button class="mascot__tap" id="mascotTap" type="button" aria-label="Tap mascot">🐱</button>
+  </aside>
+
+  <main class="container app" id="top">
+    <div class="views">
+      <section class="view is-active" id="home" data-view>
+        <section class="card glass reveal" id="valentine">
       <h2>Will you be my Valentine?</h2>
       <p class="muted">Choose wisely. The "No" button is… shy.</p>
 
@@ -50,58 +63,137 @@
 
       <div class="result" id="valentineResult" role="status" aria-live="polite"></div>
       <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
-    </section>
+        </section>
 
-    <section class="card glass reveal" id="loveMeter">
-      <h2>The Love Meter</h2>
-      <p class="muted">Enter two names. I’ll calculate the totally-scientific result.</p>
+        <section class="card glass reveal" id="loveMeter">
+          <h2>The Love Meter</h2>
+          <p class="muted">Enter two names. I’ll calculate the totally-scientific result.</p>
 
-      <form class="grid" id="loveForm">
-        <label class="field">
-          <span>Your name</span>
-          <input class="input" id="nameA" name="nameA" type="text" autocomplete="name" placeholder="e.g., Alex" required />
-        </label>
+          <form class="grid" id="loveForm">
+            <label class="field">
+              <span>Your name</span>
+              <input class="input" id="nameA" name="nameA" type="text" autocomplete="name" placeholder="e.g., Alex" required />
+            </label>
 
-        <label class="field">
-          <span>Their name</span>
-          <input class="input" id="nameB" name="nameB" type="text" placeholder="e.g., Sam" required />
-        </label>
+            <label class="field">
+              <span>Their name</span>
+              <input class="input" id="nameB" name="nameB" type="text" placeholder="e.g., Sam" required />
+            </label>
 
-        <button class="btn" type="submit">Calculate</button>
-      </form>
+            <button class="btn" type="submit">Calculate</button>
+          </form>
 
-      <div class="meter" aria-hidden="true">
-        <div class="meter__fill" id="meterFill"></div>
+          <div class="meter" aria-hidden="true">
+            <div class="meter__fill" id="meterFill"></div>
+          </div>
+
+          <div class="meterReadout" aria-live="polite">
+            <span class="meterReadout__label">Love Level</span>
+            <span class="meterReadout__value" id="meterNumber">0%</span>
+            <span class="meterReadout__pulse" aria-hidden="true">❤</span>
+          </div>
+
+          <div class="result" id="loveResult" role="status" aria-live="polite"></div>
+        </section>
+
+        <section class="card glass reveal" id="reasons">
+          <h2>Reasons Why I Like You</h2>
+          <p class="muted">One click, one sweet (or silly) reason.</p>
+
+          <div class="row">
+            <button class="btn" id="reasonBtn" type="button">Generate a reason</button>
+            <button class="btn btn-ghost" id="reasonAuto" type="button">Auto</button>
+          </div>
+          <div class="result typewriter" id="reasonResult" role="status" aria-live="polite"></div>
+        </section>
+      </section>
+
+      <section class="view" id="games" data-view>
+        <section class="card glass reveal" id="arcade">
+      <div class="cardHead">
+        <div>
+          <h2>Arcade: Cupid Flap</h2>
+          <p class="muted">Tap / click / press Space to flap. Don’t bonk the candy poles.</p>
+        </div>
+        <div class="badgeRow" aria-label="Scores">
+          <span class="badge">Score: <strong id="gameScore">0</strong></span>
+          <span class="badge">Best: <strong id="gameBest">0</strong></span>
+        </div>
       </div>
 
-      <div class="meterReadout" aria-live="polite">
-        <span class="meterReadout__label">Love Level</span>
-        <span class="meterReadout__value" id="meterNumber">0%</span>
-        <span class="meterReadout__pulse" aria-hidden="true">❤</span>
+      <div class="gameWrap" id="gameWrap">
+        <canvas class="game" id="gameCanvas" width="900" height="520" aria-label="Cupid Flap game"></canvas>
+        <div class="gameOverlay" id="gameOverlay" role="status" aria-live="polite">
+          <div class="gameOverlay__panel">
+            <div class="gameOverlay__title">Ready to flap?</div>
+            <div class="gameOverlay__text">Collect love points. Bragging rights included.</div>
+            <div class="row">
+              <button class="btn btn-yes" id="gameStart" type="button">Start</button>
+              <button class="btn btn-ghost" id="gameHow" type="button">How to play</button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="result" id="loveResult" role="status" aria-live="polite"></div>
-    </section>
+      <div class="result" id="gameMsg">Tip: On mobile, just tap anywhere inside the game.</div>
+        </section>
 
-    <section class="card glass reveal" id="reasons">
-      <h2>Reasons Why I Like You</h2>
-      <p class="muted">One click, one sweet (or silly) reason.</p>
+        <section class="card glass reveal" id="memory">
+          <div class="cardHead">
+            <div>
+              <h2>Game: Memory Match</h2>
+              <p class="muted">Flip cards. Match the love emojis. Win fast = extra cute.</p>
+            </div>
+            <div class="badgeRow">
+              <span class="badge">Moves: <strong id="mmMoves">0</strong></span>
+              <span class="badge">Matches: <strong id="mmMatches">0</strong></span>
+            </div>
+          </div>
+          <div class="memory" id="mmGrid" aria-label="Memory match grid"></div>
+          <div class="row">
+            <button class="btn" id="mmRestart" type="button">Restart</button>
+          </div>
+        </section>
 
-      <div class="row">
-        <button class="btn" id="reasonBtn" type="button">Generate a reason</button>
-        <button class="btn btn-ghost" id="reasonAuto" type="button">Auto</button>
-      </div>
-      <div class="result typewriter" id="reasonResult" role="status" aria-live="polite"></div>
-    </section>
+        <section class="card glass reveal" id="catch">
+          <div class="cardHead">
+            <div>
+              <h2>Game: Heart Catch</h2>
+              <p class="muted">Move the basket. Catch hearts, avoid heartbreak.</p>
+            </div>
+            <div class="badgeRow">
+              <span class="badge">Score: <strong id="hcScore">0</strong></span>
+              <span class="badge">Lives: <strong id="hcLives">3</strong></span>
+            </div>
+          </div>
 
-    <section class="card glass reveal" id="quiz">
+          <div class="gameWrap">
+            <canvas class="game" id="catchCanvas" width="900" height="520" aria-label="Heart catch game"></canvas>
+            <div class="gameOverlay" id="catchOverlay" role="status" aria-live="polite">
+              <div class="gameOverlay__panel">
+                <div class="gameOverlay__title">Catch mode</div>
+                <div class="gameOverlay__text">Drag or tilt your thumb to move. Tap Start.</div>
+                <div class="row">
+                  <button class="btn btn-yes" id="catchStart" type="button">Start</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="result" id="catchMsg">Tip: On mobile, drag inside the game to move the basket.</div>
+        </section>
+      </section>
+
+      <section class="view" id="quizView" data-view>
+        <section class="card glass reveal" id="quiz">
       <h2>Love Quiz</h2>
       <p class="muted">How well do you know us? 5 questions. Bragging rights included.</p>
 
       <div class="quiz" id="quizRoot"></div>
-    </section>
+        </section>
+      </section>
 
-    <section class="card glass reveal" id="bouquet">
+      <section class="view" id="gardenView" data-view>
+        <section class="card glass reveal" id="bouquet">
       <h2>Virtual Bouquet</h2>
       <p class="muted">Click anywhere in the garden to plant a flower. Watch it bloom.</p>
 
@@ -116,7 +208,42 @@
 
       <div class="garden" id="garden" role="application" aria-label="Virtual flower garden"></div>
       <p class="hint">Tip: Plant a few, then scroll up and press “Yes!”</p>
-    </section>
+        </section>
+      </section>
+
+      <section class="view" id="media" data-view>
+        <section class="card glass reveal" id="scrapbook">
+      <h2>Our Cute Scrapbook</h2>
+      <p class="muted">Big visuals, big feelings. (And a suspicious amount of hearts.)</p>
+
+      <div class="scrapbook">
+        <figure class="shot">
+          <img alt="Pink roses" loading="lazy" src="https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=1400&q=80" />
+          <figcaption>Soft petals. Soft hearts.</figcaption>
+          <span class="sticker" aria-hidden="true">💞</span>
+        </figure>
+        <figure class="shot">
+          <img alt="Heart shaped lights" loading="lazy" src="https://images.unsplash.com/photo-1511988617509-a57c8a288659?auto=format&fit=crop&w=1400&q=80" />
+          <figcaption>We’re basically a vibe.</figcaption>
+          <span class="sticker" aria-hidden="true">✨</span>
+        </figure>
+        <figure class="shot">
+          <img alt="Strawberries" loading="lazy" src="https://images.unsplash.com/photo-1518977956815-dee006303d8a?auto=format&fit=crop&w=1400&q=80" />
+          <figcaption>Sweet like you.</figcaption>
+          <span class="sticker" aria-hidden="true">🍓</span>
+        </figure>
+      </div>
+        </section>
+      </section>
+    </div>
+
+    <nav class="bottom-nav glass" aria-label="App Tabs">
+      <a class="tab is-active" href="#home" data-tab="home">Home</a>
+      <a class="tab" href="#games" data-tab="games">Games</a>
+      <a class="tab" href="#quizView" data-tab="quizView">Quiz</a>
+      <a class="tab" href="#gardenView" data-tab="gardenView">Garden</a>
+      <a class="tab" href="#media" data-tab="media">Media</a>
+    </nav>
   </main>
 
   <footer class="site-footer">

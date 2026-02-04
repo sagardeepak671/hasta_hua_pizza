@@ -14,6 +14,799 @@
     return Math.max(min, Math.min(max, v));
   }
 
+  // Canvas roundRect polyfill for older browsers
+  if (typeof CanvasRenderingContext2D !== "undefined") {
+    const proto = CanvasRenderingContext2D.prototype;
+    if (!proto.roundRect) {
+      proto.roundRect = function roundRect(x, y, w, h, r) {
+        const rr = typeof r === "number" ? { tl: r, tr: r, br: r, bl: r } : r;
+        const tl = rr?.tl ?? 0;
+        const tr = rr?.tr ?? 0;
+        const br = rr?.br ?? 0;
+        const bl = rr?.bl ?? 0;
+        this.beginPath();
+        this.moveTo(x + tl, y);
+        this.lineTo(x + w - tr, y);
+        this.quadraticCurveTo(x + w, y, x + w, y + tr);
+        this.lineTo(x + w, y + h - br);
+        this.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+        this.lineTo(x + bl, y + h);
+        this.quadraticCurveTo(x, y + h, x, y + h - bl);
+        this.lineTo(x, y + tl);
+        this.quadraticCurveTo(x, y, x + tl, y);
+        return this;
+      };
+    }
+  }
+
+  // ---------- Game: Memory Match ----------
+  const mmGrid = $("#mmGrid");
+  const mmRestart = $("#mmRestart");
+  const mmMovesEl = $("#mmMoves");
+  const mmMatchesEl = $("#mmMatches");
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function setupMemoryMatch() {
+    if (!mmGrid) return;
+    const emojis = ["💘", "💝", "💞", "😍", "😘", "🌹", "🍫", "🍓", "✨", "🥰", "🎀", "🐻"];
+    const pick = shuffle([...emojis]).slice(0, 8);
+    const deck = shuffle([...pick, ...pick].map((v, idx) => ({ v, id: idx })));
+
+    let flipped = [];
+    let locked = false;
+    let moves = 0;
+    let matches = 0;
+
+    function setHUD() {
+      if (mmMovesEl) mmMovesEl.textContent = String(moves);
+      if (mmMatchesEl) mmMatchesEl.textContent = String(matches);
+    }
+
+    mmGrid.innerHTML = "";
+    setHUD();
+
+    deck.forEach((c) => {
+      const card = document.createElement("div");
+      card.className = "mmCard";
+      card.dataset.value = c.v;
+      card.dataset.id = String(c.id);
+
+      const front = document.createElement("div");
+      front.className = "mmFace mmFront";
+      front.textContent = "❤";
+
+      const back = document.createElement("div");
+      back.className = "mmFace mmBack";
+      back.textContent = c.v;
+
+      card.appendChild(front);
+      card.appendChild(back);
+      mmGrid.appendChild(card);
+    });
+
+    function flip(card) {
+      if (!card || locked) return;
+      if (card.classList.contains("is-flipped") || card.classList.contains("is-matched")) return;
+      card.classList.add("is-flipped");
+      flipped.push(card);
+
+      if (flipped.length === 2) {
+        locked = true;
+        moves += 1;
+        setHUD();
+
+        const [a, b] = flipped;
+        const ok = a.dataset.value === b.dataset.value;
+
+        window.setTimeout(() => {
+          if (ok) {
+            a.classList.add("is-matched");
+            b.classList.add("is-matched");
+            matches += 1;
+            setHUD();
+          } else {
+            a.classList.remove("is-flipped");
+            b.classList.remove("is-flipped");
+          }
+
+          flipped = [];
+          locked = false;
+
+          if (matches === 8) {
+            // Celebrate with existing confetti
+            burstConfetti();
+          }
+        }, ok ? 360 : 560);
+      }
+    }
+
+    mmGrid.onclick = (e) => {
+      const t = e.target;
+      const card = t instanceof HTMLElement ? t.closest(".mmCard") : null;
+      if (card instanceof HTMLElement) flip(card);
+    };
+  }
+
+  if (mmRestart) {
+    mmRestart.addEventListener("click", () => setupMemoryMatch());
+  }
+  setupMemoryMatch();
+
+  // ---------- Game: Heart Catch ----------
+  const catchCanvas = $("#catchCanvas");
+  const catchOverlay = $("#catchOverlay");
+  const catchStart = $("#catchStart");
+  const hcScoreEl = $("#hcScore");
+  const hcLivesEl = $("#hcLives");
+  const catchMsg = $("#catchMsg");
+
+  function setCatchOverlay(visible) {
+    if (!catchOverlay) return;
+    catchOverlay.classList.toggle("is-hidden", !visible);
+  }
+
+  function setCatchMsg(text) {
+    if (!catchMsg) return;
+    catchMsg.textContent = text;
+  }
+
+  function setupHeartCatch() {
+    if (!catchCanvas) return null;
+    const ctx = catchCanvas.getContext("2d");
+    if (!ctx) return null;
+
+    const W = catchCanvas.width;
+    const H = catchCanvas.height;
+
+    let running = false;
+    let raf = null;
+    let last = null;
+    let score = 0;
+    let lives = 3;
+
+    const basket = {
+      x: W / 2,
+      y: H - 96,
+      w: 140,
+      h: 22,
+      vx: 0,
+    };
+
+    const drops = [];
+    let spawnT = 0;
+
+    function hud() {
+      if (hcScoreEl) hcScoreEl.textContent = String(score);
+      if (hcLivesEl) hcLivesEl.textContent = String(lives);
+    }
+
+    function reset() {
+      running = false;
+      last = null;
+      score = 0;
+      lives = 3;
+      basket.x = W / 2;
+      basket.vx = 0;
+      drops.splice(0, drops.length);
+      spawnT = 0;
+      hud();
+      draw(0);
+      setCatchOverlay(true);
+    }
+
+    function start() {
+      if (running) return;
+      running = true;
+      setCatchOverlay(false);
+      setCatchMsg("Catch 💗, avoid 💔. Drag left/right!");
+      raf = requestAnimationFrame(loop);
+    }
+
+    function stop(msg) {
+      running = false;
+      if (raf) cancelAnimationFrame(raf);
+      raf = null;
+      setCatchOverlay(true);
+      if (msg) setCatchMsg(msg);
+    }
+
+    function spawn() {
+      const bad = Math.random() < 0.18;
+      drops.push({
+        x: rand(30, W - 30),
+        y: -20,
+        vy: rand(260, 440),
+        r: bad ? 16 : 15,
+        kind: bad ? "bad" : "good",
+      });
+    }
+
+    function rectHit(px, py, r) {
+      const left = basket.x - basket.w / 2;
+      const right = basket.x + basket.w / 2;
+      const top = basket.y;
+      const bottom = basket.y + basket.h;
+      const nx = clamp(px, left, right);
+      const ny = clamp(py, top, bottom);
+      const dx = px - nx;
+      const dy = py - ny;
+      return dx * dx + dy * dy <= r * r;
+    }
+
+    function step(dt) {
+      // gently follow vx for smoother touch
+      basket.x += basket.vx * dt;
+      basket.x = clamp(basket.x, basket.w / 2 + 10, W - basket.w / 2 - 10);
+
+      spawnT += dt;
+      const rate = Math.max(0.45, 1.05 - score * 0.03);
+      if (spawnT > rate) {
+        spawnT = 0;
+        spawn();
+      }
+
+      for (let i = drops.length - 1; i >= 0; i -= 1) {
+        const d = drops[i];
+        d.y += d.vy * dt;
+
+        if (rectHit(d.x, d.y, d.r)) {
+          if (d.kind === "good") {
+            score += 1;
+          } else {
+            lives -= 1;
+          }
+          hud();
+          drops.splice(i, 1);
+          continue;
+        }
+
+        if (d.y > H - 64) {
+          // Missing a good heart hurts a bit
+          if (d.kind === "good") lives -= 1;
+          hud();
+          drops.splice(i, 1);
+        }
+      }
+
+      if (lives <= 0) {
+        stop("Game over 😭 Tap Start to try again.");
+      }
+    }
+
+    function draw(t) {
+      // background
+      const sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, "rgba(255, 192, 203, 0.55)");
+      sky.addColorStop(1, "rgba(255, 255, 255, 0.90)");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, H);
+
+      // floating hearts
+      ctx.globalAlpha = 0.18;
+      ctx.font = "28px Quicksand";
+      for (let i = 0; i < 9; i += 1) {
+        const x = (i * 130 + t * 0.05) % (W + 160) - 60;
+        const y = 80 + (i % 3) * 90 + 12 * Math.sin((t / 420) + i);
+        ctx.fillText("💗", W - x, y);
+      }
+      ctx.globalAlpha = 1;
+
+      // ground
+      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+      ctx.fillRect(0, H - 64, W, 64);
+
+      // basket
+      ctx.save();
+      ctx.translate(basket.x, basket.y);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+      ctx.strokeStyle = "rgba(255, 0, 0, 0.20)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(-basket.w / 2, 0, basket.w, basket.h, 14);
+      ctx.fill();
+      ctx.stroke();
+      ctx.font = "24px Quicksand";
+      ctx.fillStyle = "rgba(255, 0, 0, 0.70)";
+      ctx.fillText("🧺", -10, 17);
+      ctx.restore();
+
+      // drops
+      drops.forEach((d) => {
+        ctx.font = "30px Quicksand";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(d.kind === "good" ? "💗" : "💔", d.x, d.y);
+      });
+    }
+
+    function loop(ts) {
+      if (!running) return;
+      if (!last) last = ts;
+      const dt = clamp((ts - last) / 1000, 0, 0.034);
+      last = ts;
+      step(dt);
+      draw(ts);
+      if (running) raf = requestAnimationFrame(loop);
+    }
+
+    // Controls: drag inside canvas
+    let dragActive = false;
+    let dragX = 0;
+
+    function pointerDown(e) {
+      dragActive = true;
+      dragX = e.clientX;
+    }
+
+    function pointerMove(e) {
+      if (!dragActive) return;
+      const dx = e.clientX - dragX;
+      dragX = e.clientX;
+      basket.x = clamp(basket.x + dx * (window.devicePixelRatio ? 1 : 1), basket.w / 2 + 10, W - basket.w / 2 - 10);
+      // small inertia
+      basket.vx = clamp(dx * 16, -900, 900);
+    }
+
+    function pointerUp() {
+      dragActive = false;
+      basket.vx = 0;
+    }
+
+    catchCanvas.addEventListener("pointerdown", pointerDown);
+    catchCanvas.addEventListener("pointermove", pointerMove);
+    catchCanvas.addEventListener("pointerup", pointerUp);
+    catchCanvas.addEventListener("pointercancel", pointerUp);
+    catchCanvas.addEventListener("pointerleave", pointerUp);
+
+    reset();
+    return { reset, start };
+  }
+
+  const heartCatch = setupHeartCatch();
+  if (catchStart) {
+    catchStart.addEventListener("click", () => {
+      heartCatch?.reset();
+      heartCatch?.start();
+    });
+  }
+
+  // ---------- Arcade: Cupid Flap ----------
+  const gameCanvas = $("#gameCanvas");
+  const gameOverlay = $("#gameOverlay");
+  const gameStart = $("#gameStart");
+  const gameHow = $("#gameHow");
+  const gameScoreEl = $("#gameScore");
+  const gameBestEl = $("#gameBest");
+  const gameMsg = $("#gameMsg");
+
+  function setGameMsg(text) {
+    if (!gameMsg) return;
+    gameMsg.textContent = text;
+  }
+
+  function setOverlayVisible(visible) {
+    if (!gameOverlay) return;
+    gameOverlay.classList.toggle("is-hidden", !visible);
+  }
+
+  function getBest() {
+    const v = Number.parseInt(localStorage.getItem("cupidFlapBest") || "0", 10);
+    return Number.isFinite(v) ? v : 0;
+  }
+
+  function setBest(v) {
+    localStorage.setItem("cupidFlapBest", String(v));
+  }
+
+  function updateScores(score) {
+    if (gameScoreEl) gameScoreEl.textContent = String(score);
+    const best = getBest();
+    if (gameBestEl) gameBestEl.textContent = String(best);
+  }
+
+  if (gameBestEl) gameBestEl.textContent = String(getBest());
+
+  function setupGame() {
+    if (!gameCanvas) return null;
+    const ctx = gameCanvas.getContext("2d");
+    if (!ctx) return null;
+
+    let running = false;
+    let raf = null;
+    let last = null;
+    let score = 0;
+
+    const W = gameCanvas.width;
+    const H = gameCanvas.height;
+
+    const world = {
+      gravity: 1600,
+      flap: -520,
+      speed: 310,
+      gap: 170,
+      pipeWidth: 92,
+    };
+
+    const player = {
+      x: 210,
+      y: H * 0.5,
+      r: 18,
+      vy: 0,
+      rot: 0,
+    };
+
+    const pipes = [];
+
+    function reset() {
+      running = false;
+      last = null;
+      score = 0;
+      player.y = H * 0.5;
+      player.vy = 0;
+      player.rot = 0;
+      pipes.splice(0, pipes.length);
+      spawnPipe(W + 140);
+      spawnPipe(W + 440);
+      spawnPipe(W + 740);
+      updateScores(score);
+    }
+
+    function spawnPipe(x) {
+      const margin = 76;
+      const center = rand(margin + world.gap / 2, H - margin - world.gap / 2);
+      pipes.push({
+        x,
+        center,
+        scored: false,
+      });
+    }
+
+    function circleRectCollide(cx, cy, cr, rx, ry, rw, rh) {
+      const nx = clamp(cx, rx, rx + rw);
+      const ny = clamp(cy, ry, ry + rh);
+      const dx = cx - nx;
+      const dy = cy - ny;
+      return dx * dx + dy * dy <= cr * cr;
+    }
+
+    function flap() {
+      if (!running) {
+        start();
+        return;
+      }
+      player.vy = world.flap;
+    }
+
+    function start() {
+      if (running) return;
+      running = true;
+      setOverlayVisible(false);
+      setGameMsg("Go go go! Flap for love points 💗");
+      raf = requestAnimationFrame(loop);
+    }
+
+    function gameOver() {
+      running = false;
+      if (raf) cancelAnimationFrame(raf);
+      raf = null;
+
+      const best = getBest();
+      if (score > best) {
+        setBest(score);
+      }
+      updateScores(score);
+      setOverlayVisible(true);
+      setGameMsg(score >= 10 ? "Legend! Play again for an even cuter high score." : "Close one! Try again 😌");
+    }
+
+    function drawBackground(t) {
+      const sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, "rgba(255, 192, 203, 0.55)");
+      sky.addColorStop(1, "rgba(255, 255, 255, 0.85)");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, H);
+
+      // floating mini hearts
+      for (let i = 0; i < 12; i += 1) {
+        const x = (i * 110 + (t * 0.06)) % (W + 120) - 60;
+        const y = 90 + (i % 4) * 70 + 14 * Math.sin((t / 500) + i);
+        ctx.globalAlpha = 0.28;
+        ctx.fillStyle = i % 2 ? "rgba(255, 0, 0, 0.55)" : "rgba(255, 192, 203, 0.9)";
+        ctx.font = "20px Quicksand";
+        ctx.fillText("❤", W - x, y);
+      }
+      ctx.globalAlpha = 1;
+
+      // ground
+      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+      ctx.fillRect(0, H - 64, W, 64);
+      ctx.strokeStyle = "rgba(255, 0, 0, 0.18)";
+      ctx.beginPath();
+      ctx.moveTo(0, H - 64);
+      ctx.lineTo(W, H - 64);
+      ctx.stroke();
+    }
+
+    function drawPipe(x, topH, bottomY) {
+      const w = world.pipeWidth;
+
+      const grad = ctx.createLinearGradient(x, 0, x + w, 0);
+      grad.addColorStop(0, "rgba(255, 0, 0, 0.20)");
+      grad.addColorStop(0.5, "rgba(255, 255, 255, 0.65)");
+      grad.addColorStop(1, "rgba(255, 0, 0, 0.20)");
+
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = "rgba(43, 27, 36, 0.10)";
+
+      // top candy pole
+      ctx.beginPath();
+      ctx.roundRect(x, 0, w, topH, 16);
+      ctx.fill();
+      ctx.stroke();
+
+      // bottom candy pole
+      ctx.beginPath();
+      ctx.roundRect(x, bottomY, w, H - bottomY - 64, 16);
+      ctx.fill();
+      ctx.stroke();
+
+      // sprinkles
+      ctx.globalAlpha = 0.55;
+      for (let i = 0; i < 10; i += 1) {
+        const sx = x + 16 + (i * 7) % (w - 24);
+        const sy = 12 + (i * 19) % Math.max(20, topH - 20);
+        ctx.fillStyle = i % 2 ? "rgba(255, 192, 203, 0.85)" : "rgba(255, 0, 0, 0.35)";
+        ctx.fillRect(sx, sy, 4, 10);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawPlayer() {
+      ctx.save();
+      ctx.translate(player.x, player.y);
+      ctx.rotate(player.rot);
+      ctx.font = "34px Quicksand";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("💘", 0, 0);
+      ctx.restore();
+    }
+
+    function drawScore() {
+      ctx.save();
+      ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+      ctx.strokeStyle = "rgba(43, 27, 36, 0.12)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(16, 16, 170, 44, 14);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "rgba(43, 27, 36, 0.9)";
+      ctx.font = "900 18px Quicksand";
+      ctx.fillText(`Love Points: ${score}`, 30, 44);
+      ctx.restore();
+    }
+
+    function step(dt) {
+      player.vy += world.gravity * dt;
+      player.y += player.vy * dt;
+
+      const rotTarget = clamp(player.vy / 900, -0.7, 0.9);
+      player.rot += (rotTarget - player.rot) * clamp(dt * 8, 0, 1);
+
+      pipes.forEach((p) => {
+        p.x -= world.speed * dt;
+      });
+
+      // recycle
+      if (pipes.length && pipes[0].x < -world.pipeWidth - 20) {
+        pipes.shift();
+        const lastX = pipes[pipes.length - 1]?.x ?? W;
+        spawnPipe(lastX + 300);
+      }
+
+      // score
+      pipes.forEach((p) => {
+        if (!p.scored && p.x + world.pipeWidth < player.x) {
+          p.scored = true;
+          score += 1;
+          updateScores(score);
+        }
+      });
+
+      // collisions
+      if (player.y - player.r < 0 || player.y + player.r > H - 64) {
+        gameOver();
+        return;
+      }
+
+      for (const p of pipes) {
+        const topH = p.center - world.gap / 2;
+        const bottomY = p.center + world.gap / 2;
+        const rx = p.x;
+        const rw = world.pipeWidth;
+
+        if (circleRectCollide(player.x, player.y, player.r, rx, 0, rw, topH)) {
+          gameOver();
+          return;
+        }
+        if (circleRectCollide(player.x, player.y, player.r, rx, bottomY, rw, H - bottomY - 64)) {
+          gameOver();
+          return;
+        }
+      }
+    }
+
+    function draw(t) {
+      drawBackground(t);
+      pipes.forEach((p) => {
+        const topH = p.center - world.gap / 2;
+        const bottomY = p.center + world.gap / 2;
+        drawPipe(p.x, topH, bottomY);
+      });
+      drawPlayer();
+      drawScore();
+    }
+
+    function loop(ts) {
+      if (!running) return;
+      if (!last) last = ts;
+      const dt = clamp((ts - last) / 1000, 0, 0.034);
+      last = ts;
+
+      step(dt);
+      draw(ts);
+
+      if (running) raf = requestAnimationFrame(loop);
+    }
+
+    reset();
+    draw(0);
+
+    return { reset, start, flap, gameOver };
+  }
+
+  const cupidFlap = setupGame();
+
+  function gameFlap() {
+    cupidFlap?.flap();
+  }
+
+  if (gameStart) {
+    gameStart.addEventListener("click", () => {
+      cupidFlap?.reset();
+      cupidFlap?.start();
+    });
+  }
+
+  if (gameHow) {
+    gameHow.addEventListener("click", () => {
+      setGameMsg("How to play: Tap/click/Space to flap 💘. Pass poles = +1 point. Hit anything = game over.");
+    });
+  }
+
+  if (gameCanvas) {
+    gameCanvas.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      gameFlap();
+    });
+  }
+
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Space") {
+      e.preventDefault();
+      gameFlap();
+    }
+  });
+
+  // ---------- App Router (bottom tabs) ----------
+  const views = $$('[data-view]');
+  const tabs = $$('[data-tab]');
+
+  // ---------- Mascot ----------
+  const mascotText = $("#mascotText");
+  const mascotTap = $("#mascotTap");
+
+  const mascotLines = [
+    "I’m cheering for you 💗",
+    "Pro tip: Hearts are easier to catch than feelings.",
+    "If you get a perfect quiz score, I will be impressed.",
+    "Try Cupid Flap. It’s chaotic-cute.",
+    "Plant flowers in Garden. I love watching them bloom.",
+    "You are illegally adorable. That’s my verdict.",
+  ];
+
+  function say(line) {
+    if (!mascotText) return;
+    mascotText.textContent = line;
+  }
+
+  let mascotIdx = 0;
+  if (mascotTap) {
+    mascotTap.addEventListener("click", () => {
+      mascotIdx = (mascotIdx + 1) % mascotLines.length;
+      say(mascotLines[mascotIdx]);
+    });
+  }
+
+  const sectionToView = {
+    valentine: "home",
+    loveMeter: "home",
+    reasons: "home",
+    arcade: "games",
+    memory: "games",
+    catch: "games",
+    quiz: "quizView",
+    bouquet: "gardenView",
+    scrapbook: "media",
+  };
+
+  function showView(id) {
+    const next = views.find((v) => v.id === id) ? id : "home";
+    views.forEach((v) => v.classList.toggle("is-active", v.id === next));
+    tabs.forEach((t) => t.classList.toggle("is-active", t.dataset.tab === next));
+
+    // Reveal animations need a nudge when a view becomes visible
+    const reveal = $$(".reveal", document.getElementById(next) || document);
+    reveal.forEach((el) => {
+      // Allow intersection observer to do its thing; also make sure hidden views don't stay invisible forever.
+      el.classList.add("is-visible");
+    });
+
+    if (next === "games") say("Games time! Tap Start and show me your skills 🎮💗");
+    if (next === "home") say("Home sweet home. Press Yes when you’re ready 😌");
+    if (next === "gardenView") say("Garden mode: plant flowers like a romance wizard 🌷");
+    if (next === "media") say("Scrapbook! Big photos, big feelings ✨");
+    if (next === "quizView") say("Quiz time. No pressure… okay tiny pressure 😄");
+  }
+
+  function currentHashView() {
+    const raw = (window.location.hash || "#home").slice(1);
+    return raw || "home";
+  }
+
+  window.addEventListener("hashchange", () => {
+    showView(currentHashView());
+  });
+
+  // Initial route
+  showView(currentHashView());
+
+  // Make the top navigation work with app views.
+  // If a link points to an in-view section (e.g. #bouquet), switch views first and then scroll.
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLElement)) return;
+
+    const a = t.closest(".top-nav a");
+    if (!(a instanceof HTMLAnchorElement)) return;
+
+    const href = a.getAttribute("href") || "";
+    if (!href.startsWith("#")) return;
+    const id = href.slice(1);
+    if (!id) return;
+
+    const viewId = sectionToView[id] || (views.find((v) => v.id === id) ? id : null);
+    if (!viewId) return;
+
+    e.preventDefault();
+    window.location.hash = `#${viewId}`;
+
+    window.setTimeout(() => {
+      const target = document.getElementById(id);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 0);
+  });
+
   function spawnHeart() {
     if (!heartsRoot) return;
 
