@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Be My Valentine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Floating hearts background (CSS particles) -->
+  <div class="hearts" aria-hidden="true" id="hearts"></div>
+  <div class="blobs" aria-hidden="true">
+    <span class="blob blob--a"></span>
+    <span class="blob blob--b"></span>
+    <span class="blob blob--c"></span>
+  </div>
+  <div class="sparkles" aria-hidden="true" id="sparkles"></div>
+
+  <nav class="top-nav glass" aria-label="Page">
+    <a class="nav__brand" href="#top">💗</a>
+    <div class="nav__links">
+      <a href="#valentine">Valentine</a>
+      <a href="#loveMeter">Love Meter</a>
+      <a href="#reasons">Reasons</a>
+      <a href="#quiz">Quiz</a>
+      <a href="#bouquet">Bouquet</a>
+    </div>
+    <button class="btn btn-small" id="letterBtn" type="button">Love Letter</button>
+  </nav>
+
+  <header class="site-header">
+    <div class="brand glass">
+      <h1 class="title">Happy Valentine’s Day</h1>
+      <p class="subtitle">Cute, whimsical, and just a little mischievous.</p>
+    </div>
+  </header>
+
+  <main class="container" id="top">
+    <section class="card glass reveal" id="valentine">
+      <h2>Will you be my Valentine?</h2>
+      <p class="muted">Choose wisely. The "No" button is… shy.</p>
+
+      <div class="valentine-stage" id="valentineStage">
+        <button class="btn btn-yes" id="yesBtn" type="button">Yes!</button>
+        <button class="btn btn-no" id="noBtn" type="button">No</button>
+      </div>
+
+      <div class="result" id="valentineResult" role="status" aria-live="polite"></div>
+      <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
+    </section>
+
+    <section class="card glass reveal" id="loveMeter">
+      <h2>The Love Meter</h2>
+      <p class="muted">Enter two names. I’ll calculate the totally-scientific result.</p>
+
+      <form class="grid" id="loveForm">
+        <label class="field">
+          <span>Your name</span>
+          <input class="input" id="nameA" name="nameA" type="text" autocomplete="name" placeholder="e.g., Alex" required />
+        </label>
+
+        <label class="field">
+          <span>Their name</span>
+          <input class="input" id="nameB" name="nameB" type="text" placeholder="e.g., Sam" required />
+        </label>
+
+        <button class="btn" type="submit">Calculate</button>
+      </form>
+
+      <div class="meter" aria-hidden="true">
+        <div class="meter__fill" id="meterFill"></div>
+      </div>
+
+      <div class="meterReadout" aria-live="polite">
+        <span class="meterReadout__label">Love Level</span>
+        <span class="meterReadout__value" id="meterNumber">0%</span>
+        <span class="meterReadout__pulse" aria-hidden="true">❤</span>
+      </div>
+
+      <div class="result" id="loveResult" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="card glass reveal" id="reasons">
+      <h2>Reasons Why I Like You</h2>
+      <p class="muted">One click, one sweet (or silly) reason.</p>
+
+      <div class="row">
+        <button class="btn" id="reasonBtn" type="button">Generate a reason</button>
+        <button class="btn btn-ghost" id="reasonAuto" type="button">Auto</button>
+      </div>
+      <div class="result typewriter" id="reasonResult" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="card glass reveal" id="quiz">
+      <h2>Love Quiz</h2>
+      <p class="muted">How well do you know us? 5 questions. Bragging rights included.</p>
+
+      <div class="quiz" id="quizRoot"></div>
+    </section>
+
+    <section class="card glass reveal" id="bouquet">
+      <h2>Virtual Bouquet</h2>
+      <p class="muted">Click anywhere in the garden to plant a flower. Watch it bloom.</p>
+
+      <div class="bouquetBar">
+        <span class="bouquetBar__label">Flower:</span>
+        <button class="chip chip--active" type="button" data-flower="classic">Classic</button>
+        <button class="chip" type="button" data-flower="tulip">Tulip</button>
+        <button class="chip" type="button" data-flower="daisy">Daisy</button>
+        <button class="chip" type="button" data-flower="rose">Rose</button>
+        <button class="chip" id="clearGarden" type="button">Clear</button>
+      </div>
+
+      <div class="garden" id="garden" role="application" aria-label="Virtual flower garden"></div>
+      <p class="hint">Tip: Plant a few, then scroll up and press “Yes!”</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="glass footer-inner">
+      <p>Made with pastel pink, creamy white, and an unreasonable amount of love.</p>
+    </div>
+  </footer>
+
+  <div class="modal" id="letterModal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Love letter">
+    <div class="modal__backdrop" data-close="true"></div>
+    <div class="modal__panel glass">
+      <div class="modal__header">
+        <h3 class="modal__title">A tiny love letter</h3>
+        <button class="btn btn-small" type="button" data-close="true">Close</button>
+      </div>
+      <p class="modal__text" id="letterText"></p>
+      <div class="modal__actions">
+        <button class="btn" id="newLetter" type="button">New letter</button>
+        <button class="btn btn-ghost" id="copyLetter" type="button">Copy</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
