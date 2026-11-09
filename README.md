@@ -3,6 +3,8 @@
 A single-page interactive Valentine's card: three playable arcade games, a love meter, a quiz, a
 plantable flower garden, a scrapbook, and a "No" button that runs away from your cursor.
 
+**Live Demo:** [https://sagardeepak671.github.io/hasta_hua_pizza/](https://sagardeepak671.github.io/hasta_hua_pizza/)
+
 **Zero dependencies.** No React, no build step, no npm install — three files, ~3,000 lines of
 hand-written HTML, CSS and vanilla JavaScript. Open `index.html` and it works.
 
